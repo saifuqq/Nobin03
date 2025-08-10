@@ -1847,7 +1847,7 @@ async function submitOrder() {
 
     // --- Google Apps Script Web App URL ---
     // REPLACE THIS URL with your deployed Google Apps Script Web App URL
-    const GOOGLE_APP_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzWizr_5fN4Nuj9XhaQfTVO-v966aG5qNzKQfnShzZL7kzdDif9LP2AvkKFdOUYW_u4Ag/exec';
+    const GOOGLE_APP_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwVoHAmAC_f4SirtMVzVtP_lCuks_FUHq8sdJPA4Sfm2O-VAnHfpHG4kiDeTS31kDoT/exec';
 
     try {
         const response = await fetch(GOOGLE_APP_SCRIPT_WEB_APP_URL, {
