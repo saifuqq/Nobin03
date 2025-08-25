@@ -1,3 +1,89 @@
+// AI กรอกข้อมูลอัตโนมัติและ preview เมื่อวางข้อความใน bulkProductTextarea
+document.addEventListener('DOMContentLoaded', function() {
+    // Bulk Check Modal: Enable/disable 'เช็คสินค้าสำเร็จ' button
+    const bulkCheckTextarea = document.getElementById('bulkCheckTextarea');
+    const confirmBulkCheckBtn = document.getElementById('confirmBulkCheckBtn');
+    if (bulkCheckTextarea && confirmBulkCheckBtn) {
+        const updateBulkCheckBtnState = () => {
+            const text = bulkCheckTextarea.value.trim();
+            if (!text) {
+                confirmBulkCheckBtn.disabled = true;
+                return;
+            }
+            try {
+                let parsed = parseBulkProductText(text);
+                confirmBulkCheckBtn.disabled = parsed.length === 0;
+            } catch {
+                confirmBulkCheckBtn.disabled = true;
+            }
+        };
+        bulkCheckTextarea.addEventListener('input', updateBulkCheckBtnState);
+        bulkCheckTextarea.addEventListener('paste', function() { setTimeout(updateBulkCheckBtnState, 50); });
+        // เรียกครั้งแรกเมื่อ modal เปิด
+        if (typeof openBulkCheckModal === 'function') {
+            const origOpen = openBulkCheckModal;
+            window.openBulkCheckModal = function() {
+                origOpen();
+                setTimeout(updateBulkCheckBtnState, 10);
+            };
+        }
+    }
+    const bulkProductTextarea = document.getElementById('bulkProductTextarea');
+    const bulkProductPreview = document.getElementById('bulkProductPreview');
+    const bulkProductSendBtn = document.getElementById('bulkProductSendBtn');
+    if (bulkProductTextarea && bulkProductPreview) {
+        const previewBulkProduct = () => {
+            const text = bulkProductTextarea.value.trim();
+            if (!text) {
+                bulkProductPreview.innerHTML = '<span class="text-gray-400">กรุณาวางข้อความสินค้า</span>';
+                return;
+            }
+            try {
+                let parsed = parseBulkProductText(text);
+                if (!parsed.length) {
+                    bulkProductPreview.innerHTML = '<span class="text-red-500">ไม่พบสินค้าที่ถูกต้อง</span>';
+                    return;
+                }
+                let html = '<div class="text-left">';
+                parsed.forEach((p, i) => {
+                    let typeText = '';
+                    if (p.variants && p.variants.length > 0) {
+                        typeText = p.variants.map(v => v.type).filter(Boolean).join(' / ');
+                    }
+                    let priceText = '';
+                    if (p.variants && p.variants.length > 0) {
+                        let prices = p.variants.map(v => v.price ? v.price : null).filter(Boolean);
+                        priceText = prices.length > 0 ? prices.join(' / ') : 'ราคาไม่ระบุ';
+                    } else {
+                        priceText = 'ราคาไม่ระบุ';
+                    }
+                    let status = p.status || 'มี';
+                    let line = `<b>${p.baseName}</b>`;
+                    if (typeText) line += ` (${typeText})`;
+                    line += `: ${priceText} - <span class='${status.includes('ของหมด') ? 'text-red-500' : status.includes('จำกัด') ? 'text-yellow-500' : status.includes('เข้าแล้ว') ? 'text-green-600' : 'text-green-600'}'>${status}</span>`;
+                    html += `<div class='mb-1'>${line}</div>`;
+                });
+                html += '</div>';
+                bulkProductPreview.innerHTML = html;
+            } catch (e) {
+                bulkProductPreview.innerHTML = '<span class="text-red-500">เกิดข้อผิดพลาด: ' + e.message + '</span>';
+            }
+        };
+        bulkProductTextarea.addEventListener('input', previewBulkProduct);
+        bulkProductTextarea.addEventListener('paste', function() { setTimeout(previewBulkProduct, 50); });
+    }
+    if (bulkProductSendBtn) {
+        bulkProductSendBtn.addEventListener('click', function() {
+            // เรียกฟังก์ชันเพิ่มสินค้า bulk จริง
+            if (typeof confirmBulkAddProducts === 'function') {
+                confirmBulkAddProducts();
+            } else {
+                showToast('ไม่พบฟังก์ชันเพิ่มสินค้า bulk', 'error');
+            }
+        });
+    }
+});
+// ...existing code...
 // ฟังก์ชันสำหรับปุ่ม 'เช็คสินค้าสำเร็จ' (สามารถต่อยอด logic เพิ่มสินค้าได้)
 function confirmBulkCheckProducts() {
     // ดึงข้อความจาก textarea
@@ -1445,8 +1531,8 @@ function initializeIntersectionObserver() {
         footer.classList.add('dark-mode-bg', 'text-gray-400');
         footer.classList.remove('light-mode-bg-lightgray', 'text-gray-600');
     } else {
-        footer.classList.add('light-mode-bg-lightgray', 'text-gray-600');
-               footer.classList.remove('dark-mode-bg', 'text-gray-400');
+        footer.classList.add('light-mode-bg-lightgray', 'text-gray-800');
+        footer.classList.remove('dark-mode-bg', 'text-gray-400');
     }
 
     // Update social media icons for dark/light mode
@@ -1552,9 +1638,10 @@ function renderProducts() {
     productsToDisplay.forEach((product, index) => {
         const productCard = document.createElement("div");
         // กำหนด class และ click listener ตามสถานะจริง
-        let isOutOfStock = product.status === 'ของหมด' || product.status === '❌ ของหมด';
-        let isLimited = product.status === 'จำกัดออเดอร์' || product.status === 'จำกัดสินค้า';
-        let isRestocked = product.status === 'ของเข้าแล้ว';
+    let isOutOfStock = product.status === 'ของหมด' || product.status === '❌ ของหมด';
+    let isLimited = product.status === 'จำกัดออเดอร์' || product.status === 'จำกัดสินค้า';
+    let isRestocked = product.status === 'ของเข้าแล้ว';
+    let isAvailable = product.status === 'มี';
         productCard.className = `product-card p-4 rounded shadow-lg hover:shadow-xl ${isOutOfStock ? 'out-of-stock' : 'cursor-pointer'}`;
         productCard.setAttribute("data-base-name", product.baseName);
         productCard.setAttribute("data-category", product.category);
@@ -1581,11 +1668,13 @@ function renderProducts() {
         // สถานะสินค้า (ใช้ product.status จาก logic bulk/check เป็นหลัก)
         let statusText = '';
         if (isOutOfStock) {
-            statusText = '<span class="text-red-500 font-bold ml-2">ของหมด</span>';
+            statusText = '<span class="text-red-500 font-bold ml-2">สินค้าหมด <a href="#" class="underline text-xs text-blue-400 ml-1" title="ดูรายละเอียด">ดูข้อมูล</a></span>';
         } else if (isLimited) {
             statusText = '<span class="text-yellow-500 font-bold ml-2">จำกัดออเดอร์</span>';
         } else if (isRestocked) {
             statusText = '<span class="text-green-600 font-bold ml-2">ของเข้าแล้ว</span>';
+        } else if (isAvailable) {
+            statusText = '<span class="text-green-500 font-bold ml-2">ของมี <a href="#" class="underline text-xs text-blue-400 ml-1" title="ดูรายละเอียด">ดูข้อมูล</a></span>';
         }
 
         productCard.innerHTML = `
@@ -2770,6 +2859,7 @@ function previewBulkAddProducts() {
     if (!text) {
         document.getElementById('bulkAddPreview').innerHTML = '<span class="text-red-500">กรุณาวางข้อความสินค้า</span>';
         return;
+    }
     try {
         let parsed = parseBulkProductText(text);
         // เงื่อนไข: ไม่เอาสินค้าที่มี "❌" หรือ "ต้องขาย" หรือ "รับได้" หรือ "📌" หรือ "ของหมด" หรือ "หมด" หรือ "รับได้...คอต" หรือ "รับได้...แถว" หรือ "รับได้...มวน" หรือ "ไม่ได้เขียวอะไร" หรือ "ต้องขาย..." หรือ "ราคาขึ้น" หรือ "ผิดร้าน" หรือ "ไม่ส่ง" หรือ "ของหมด" หรือ "หมด" ใน note หรือชื่อ
@@ -2789,7 +2879,6 @@ function previewBulkAddProducts() {
         document.getElementById('bulkAddPreview').innerHTML = html;
     } catch (e) {
         document.getElementById('bulkAddPreview').innerHTML = '<span class="text-red-500">เกิดข้อผิดพลาด: ' + e.message + '</span>';
-    }
     }
 }
 
@@ -2830,4 +2919,36 @@ function confirmBulkAddProducts() {
     if (typeof renderAdminProductListByCategory === 'function') renderAdminProductListByCategory();
     closeBulkAddModal();
     showToast('เพิ่มสินค้าทั้งหมดเรียบร้อยแล้ว', 'success');
+}
+
+// เพิ่มฟังก์ชัน toggleProductOutOfStock สำหรับปุ่มแจ้งสินค้าหมดในแผงควบคุม พร้อม showToast แจ้งเตือนและ sync สถานะไปยัง cart/รายการสินค้า
+function toggleProductOutOfStock(category, idx) {
+    const prod = products[category][idx];
+    if (prod.status === 'ของหมด' || prod.status === '❌ ของหมด') {
+        prod.status = 'มี';
+        // ถ้าสินค้ากลับมามี ให้ลบ flag สินค้าหมดใน cart
+        if (Array.isArray(cart)) {
+            cart.forEach(item => {
+                if (item.baseName === prod.baseName && item.category === category) {
+                    item.isOutOfStock = false;
+                }
+            });
+            if (typeof updateCartDisplay === 'function') updateCartDisplay();
+        }
+        showToast(`สินค้า "${prod.baseName}" กลับมามีในสต็อกแล้ว`, 'success');
+    } else {
+        prod.status = 'ของหมด';
+        // mark ว่าใน cart สินค้านี้หมด (ไม่ลบสินค้าออก)
+        if (Array.isArray(cart)) {
+            cart.forEach(item => {
+                if (item.baseName === prod.baseName && item.category === category) {
+                    item.isOutOfStock = true;
+                }
+            });
+            if (typeof updateCartDisplay === 'function') updateCartDisplay();
+        }
+        showToast(`สินค้า "${prod.baseName}" ถูกแจ้งว่าสินค้าหมดแล้ว (จะแสดง \"สินค้าหมด\" ในหน้ารายการสินค้าและตะกร้า)`, 'warning');
+    }
+    renderAdminProductListByCategory();
+    if (typeof renderProducts === 'function') renderProducts();
 }
